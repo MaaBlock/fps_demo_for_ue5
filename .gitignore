@@ -1,0 +1,26 @@
+﻿# Visual Studio
+.vs/
+*.VC.db
+*.VC.VC.opendb
+
+# Builds
+Build/
+Exported/
+Dist/
+
+# Cache files
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# Other
+.idea/
+.vscode/
+*.code-workspace
+*.sln
+*.suo
+*.xcodeproj
+*.xcworkspace
+*.zip
+*~
+.DS_Store
