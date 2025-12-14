@@ -200,10 +200,6 @@ void AShooterPlayerController::OnBulletCountUpdated(int32 MagazineSize, int32 Bu
 
 void AShooterPlayerController::OnPawnDamaged(float LifePercent)
 {
-	if (IsValid(BulletCounterUI))
-	{
-		BulletCounterUI->BP_Damaged(LifePercent);
-	}
 	if (IsValid(GameUI))
 	{
 		GameUI->BP_UpdateHealthBar(LifePercent);	

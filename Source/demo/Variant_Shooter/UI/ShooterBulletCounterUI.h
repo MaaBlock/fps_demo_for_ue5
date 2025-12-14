@@ -20,10 +20,6 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category="Shooter", meta=(DisplayName = "UpdateBulletCounter"))
 	void BP_UpdateBulletCounter(int32 MagazineSize, int32 BulletCount);
 
-	/** Allows Blueprint to update sub-widgets with the new life total and play a damage effect on the HUD */
-	UFUNCTION(BlueprintImplementableEvent, Category="Shooter", meta=(DisplayName = "Damaged"))
-	void BP_Damaged(float LifePercent);
-
 	UFUNCTION(BlueprintImplementableEvent, Category="Shooter", meta=(DisplayName = "PlayDamageEffect"))
 	void BP_PlayDamageEffect();
 };
