@@ -15,16 +15,6 @@ class DEMO_API AShooterGameState : public AGameState
 {
 	GENERATED_BODY()
 protected:
-	UPROPERTY(ReplicatedUsing = OnRep_CurrentScore)
-	int CurrentScore[2];
-public:
-	UPROPERTY(BlueprintAssignable, Category = "Events")
-	FOnScoreChanged OnScoreChanged;
-protected:
-	UFUNCTION()
-	void OnRep_CurrentScore();
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 public:
 	AShooterGameState();
-	void IncrementTeamScore(uint8 TeamByte);
 };

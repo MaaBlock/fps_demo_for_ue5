@@ -14,8 +14,3 @@ void AShooterGameMode::BeginPlay()
 	
 }
 
-void AShooterGameMode::IncrementTeamScore(uint8 TeamByte)
-{
-	auto GS  = GetGameState<AShooterGameState>();
-	GS->IncrementTeamScore(TeamByte);
-}

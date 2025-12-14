@@ -28,6 +28,4 @@ protected:
 
 public:
 
-	/** Increases the score for the given team */
-	void IncrementTeamScore(uint8 TeamByte);
 };

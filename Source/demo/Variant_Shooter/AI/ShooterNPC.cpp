@@ -213,10 +213,6 @@ void AShooterNPC::Auth_Die(AController* KillerController)
 		}
 	}	
 
-	if (AShooterGameMode* GM = Cast<AShooterGameMode>(GetWorld()->GetAuthGameMode()))
-	{
-		GM->IncrementTeamScore(TeamByte);
-	}
 	SV_REPCALL(bIsDead);
 }
 

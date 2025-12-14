@@ -6,28 +6,10 @@
 #include "Net/UnrealNetwork.h"
 
 
-void AShooterGameState::OnRep_CurrentScore()
-{
-	OnScoreChanged.Broadcast(CurrentScore[0],CurrentScore[1]);
-}
 
-void AShooterGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-    DOREPLIFETIME(AShooterGameState, CurrentScore);
-}
 
-AShooterGameState::AShooterGameState() : CurrentScore{}
+AShooterGameState::AShooterGameState() 
 {
 	
 }
 
-void AShooterGameState::IncrementTeamScore(uint8 TeamByte)
-{
-	if (GetLocalRole() != ROLE_Authority)
-		return;
-	if (TeamByte >= 2)
-		return;
-	CurrentScore[TeamByte]++;
-    OnRep_CurrentScore();
-}

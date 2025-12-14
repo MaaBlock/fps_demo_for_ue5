@@ -335,10 +335,6 @@ void AShooterCharacter::Auth_Die(AController* KillerController)
 			KillerPS->Auth_AddCoins(KillReward);
 		}
 	}	
-	if (AShooterGameMode* GM = Cast<AShooterGameMode>(GetWorld()->GetAuthGameMode()))
-	{
-		GM->IncrementTeamScore(TeamByte);
-	}
 	
 	GetWorld()->GetTimerManager().SetTimer(RespawnTimer, this, &AShooterCharacter::Auth_OnRespawn, RespawnTime, false);
 	MC_Die();
