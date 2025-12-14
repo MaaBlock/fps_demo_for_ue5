@@ -66,8 +66,12 @@ public:
 	/** Constructor */
 	AShooterPickup();
 
+	
 protected:
 
+	UFUNCTION(NetMulticast, Reliable)
+	void MC_OnPickedUp();
+	
 	/** Native construction script */
 	virtual void OnConstruction(const FTransform& Transform) override;
 

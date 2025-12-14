@@ -14,6 +14,8 @@ AShooterPickup::AShooterPickup()
 {
  	PrimaryActorTick.bCanEverTick = true;
 
+	bReplicates = true;
+	
 	// create the root
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
@@ -36,6 +38,15 @@ AShooterPickup::AShooterPickup()
 	Mesh->SetupAttachment(SphereCollision);
 
 	Mesh->SetCollisionProfileName(FName("NoCollision"));
+
+	
+}
+ 
+void AShooterPickup::MC_OnPickedUp_Implementation()
+{
+	SetActorHiddenInGame(true);
+	SetActorEnableCollision(false);
+	SetActorTickEnabled(false);
 }
 
 void AShooterPickup::OnConstruction(const FTransform& Transform)
@@ -46,13 +57,14 @@ void AShooterPickup::OnConstruction(const FTransform& Transform)
 	{
 		// set the mesh
 		Mesh->SetStaticMesh(WeaponData->StaticMesh.LoadSynchronous());
+		WeaponClass = WeaponData->WeaponToSpawn;
 	}
 }
 
 void AShooterPickup::BeginPlay()
 {
 	Super::BeginPlay();
-
+	
 	if (FWeaponTableRow* WeaponData = WeaponType.GetRow<FWeaponTableRow>(FString()))
 	{
 		// copy the weapon class
@@ -70,19 +82,15 @@ void AShooterPickup::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AShooterPickup::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
+	if (!HasAuthority())
+		return;
+
 	// have we collided against a weapon holder?
 	if (IShooterWeaponHolder* WeaponHolder = Cast<IShooterWeaponHolder>(OtherActor))
 	{
 		WeaponHolder->AddWeaponClass(WeaponClass);
-
-		// hide this mesh
-		SetActorHiddenInGame(true);
-
-		// disable collision
-		SetActorEnableCollision(false);
-
-		// disable ticking
-		SetActorTickEnabled(false);
+		
+		MC_OnPickedUp();
 
 		// schedule the respawn
 		GetWorld()->GetTimerManager().SetTimer(RespawnTimer, this, &AShooterPickup::RespawnPickup, RespawnTime, false);

@@ -47,6 +47,7 @@ protected:
 	int32 MagazineSize = 10;
 
 	/** Number of bullets in the current magazine */
+	UPROPERTY(ReplicatedUsing="OnRep_CurrentBullets")
 	int32 CurrentBullets = 0;
 	
 	/** Animation montage to play when firing this weapon */
@@ -95,6 +96,7 @@ protected:
 	FTimerHandle RefireTimer;
 
 	/** Cast pawn pointer to the owner for AI perception system interactions */
+	UPROPERTY(ReplicatedUsing="OnRep_PawnOwner")
 	TObjectPtr<APawn> PawnOwner;
 
 	/** Loudness of the shot for AI perception system interactions */
@@ -109,11 +111,13 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Perception")
 	FName ShotNoiseTag = FName("Shot");
 
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	
 public:	
 
 	/** Constructor */
 	AShooterWeapon();
-
+	
 protected:
 	
 	/** Gameplay initialization */
@@ -123,13 +127,18 @@ protected:
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
 
 protected:
+	UFUNCTION()
+	void OnRep_PawnOwner();
 
 	/** Called when the weapon's owner is destroyed */
 	UFUNCTION()
 	void OnOwnerDestroyed(AActor* DestroyedActor);
 
+	UFUNCTION()
+	void OnRep_CurrentBullets();
 public:
 
+	
 	/** Activates this weapon and gets it ready to fire */
 	void ActivateWeapon();
 
@@ -137,24 +146,30 @@ public:
 	void DeactivateWeapon();
 
 	/** Start firing this weapon */
-	void StartFiring();
+	void Auth_StartFiring();
 
 	/** Stop firing this weapon */
-	void StopFiring();
+	void Auth_StopFiring();
 
 protected:
 
 	/** Fire the weapon */
-	virtual void Fire();
+	virtual void Auth_DoFire();
 
 	/** Called when the refire rate time has passed while shooting semi auto weapons */
-	void FireCooldownExpired();
+	void Auth_FireCooldownExpired();
 
 	/** Fire a projectile towards the target location */
-	virtual void FireProjectile(const FVector& TargetLocation);
+	virtual void Auth_FireProjectile(const FVector& TargetLocation);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MC_Fire();
+	
+	UFUNCTION(Client, Reliable)
+	void Client_Fire();
 
 	/** Calculates the spawn transform for projectiles shot by this weapon */
-	FTransform CalculateProjectileSpawnTransform(const FVector& TargetLocation) const;
+	FTransform Auth_CalculateProjectileSpawnTransform(const FVector& TargetLocation) const;
 
 public:
 

@@ -14,6 +14,8 @@ class UPawnNoiseEmitterComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBulletCountUpdatedDelegate, int32, MagazineSize, int32, Bullets);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FDamagedDelegate, float, LifePercent);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FDamageEffectDelegate);
+
 
 /**
  *  A player controllable first person shooter character
@@ -56,6 +58,7 @@ protected:
 	float MaxHP = 500.0f;
 
 	/** Current HP remaining to this character */
+	UPROPERTY(ReplicatedUsing="OnRep_CurrentHP")
 	float CurrentHP = 0.0f;
 
 	/** Team ID for this character*/
@@ -63,9 +66,11 @@ protected:
 	uint8 TeamByte = 0;
 
 	/** List of weapons picked up by the character */
+	UPROPERTY(Replicated)
 	TArray<AShooterWeapon*> OwnedWeapons;
 
 	/** Weapon currently equipped and ready to shoot with */
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentWeapon)
 	TObjectPtr<AShooterWeapon> CurrentWeapon;
 
 	UPROPERTY(EditAnywhere, Category ="Destruction", meta = (ClampMin = 0, ClampMax = 10, Units = "s"))
@@ -81,6 +86,9 @@ public:
 	/** Damaged delegate */
 	FDamagedDelegate OnDamaged;
 
+	FDamageEffectDelegate OnDamageEffect;
+
+
 public:
 
 	/** Constructor */
@@ -88,6 +96,22 @@ public:
 
 protected:
 
+	UFUNCTION()
+	void OnRep_CurrentWeapon(AShooterWeapon* OldWeapon);
+	
+	UFUNCTION()
+	void OnRep_CurrentHP();
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION(Server, Reliable)
+	void Server_StartFiring();
+	UFUNCTION(Server, Reliable)
+	void Server_StopFiring();
+	UFUNCTION(Server, Reliable)
+	void Server_SwitchWeapon();
+	void Auth_StopFiring();
+	void Auth_StartFiring();
+	void Auth_SwitchWeapon();
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
 
@@ -101,7 +125,8 @@ public:
 
 	/** Handle incoming damage */
 	virtual float TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
-
+	float Auth_TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser);
+	void Local_PlayHitImpactFX();
 public:
 
 	/** Handles start firing input */
@@ -117,7 +142,7 @@ public:
 	void DoSwitchWeapon();
 
 public:
-
+	float GetHealthPercent() const { return CurrentHP / MaxHP; }
 	//~Begin IShooterWeaponHolder interface
 
 	/** Attaches a weapon's meshes to the owner */
@@ -155,12 +180,14 @@ protected:
 	AShooterWeapon* FindWeaponOfType(TSubclassOf<AShooterWeapon> WeaponClass) const;
 
 	/** Called when this character's HP is depleted */
-	void Die();
+	void Auth_Die(AController* KillerController);
+	UFUNCTION(NetMulticast,Reliable)
+	void MC_Die();
 
 	/** Called to allow Blueprint code to react to this character's death */
 	UFUNCTION(BlueprintImplementableEvent, Category="Shooter", meta = (DisplayName = "On Death"))
 	void BP_OnDeath();
 
 	/** Called from the respawn timer to destroy this character and force the PC to respawn */
-	void OnRespawn();
+	void Auth_OnRespawn();
 };

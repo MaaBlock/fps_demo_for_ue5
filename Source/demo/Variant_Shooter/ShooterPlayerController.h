@@ -7,6 +7,7 @@
 #include "ShooterPlayerController.generated.h"
 
 class UShooterUI;
+class UGameUI;
 class UInputMappingContext;
 class AShooterCharacter;
 class UShooterBulletCounterUI;
@@ -59,8 +60,20 @@ protected:
 
 	/** Pointer to the UI widget */
 	TObjectPtr<UShooterUI> ShooterUI;
-protected:
 
+	
+	/** Type of UI widget to spawn */
+	UPROPERTY(EditAnywhere, Category="UI")
+	TSubclassOf<UGameUI> GameUIClass;
+
+	/** Pointer to the UI widget */
+	TObjectPtr<UGameUI> GameUI;
+protected:
+	virtual void OnRep_PlayerState() override;
+	
+	virtual void OnRep_Pawn() override;
+	virtual void SetPawn(APawn* InPawn) override;
+	
 	/** Gameplay Initialization */
 	virtual void BeginPlay() override;
 
@@ -69,6 +82,10 @@ protected:
 
 	/** Pawn initialization */
 	virtual void OnPossess(APawn* InPawn) override;
+	
+	UFUNCTION(Client,Reliable)
+	void Client_OnPossess(APawn* InPawn);
+	void SetupPawnDelegates(APawn* InPawn);
 
 	/** Called if the possessed pawn is destroyed */
 	UFUNCTION()
@@ -81,4 +98,7 @@ protected:
 	/** Called when the possessed pawn is damaged */
 	UFUNCTION()
 	void OnPawnDamaged(float LifePercent);
+
+	UFUNCTION()
+	void OnPawnDamageEffect();
 };

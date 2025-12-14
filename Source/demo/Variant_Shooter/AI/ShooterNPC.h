@@ -24,7 +24,7 @@ class DEMO_API AShooterNPC : public AdemoCharacter, public IShooterWeaponHolder
 public:
 
 	/** Current HP for this character. It dies if it reaches zero through damage */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Damage")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Damage",ReplicatedUsing=OnRep_CurrentHP)
 	float CurrentHP = 100.0f;
 
 protected:
@@ -42,6 +42,7 @@ protected:
 	uint8 TeamByte = 1;
 
 	/** Pointer to the equipped weapon */
+	UPROPERTY(ReplicatedUsing = OnRep_Weapon)
 	TObjectPtr<AShooterWeapon> Weapon;
 
 	/** Type of weapon to spawn for this character */
@@ -79,6 +80,7 @@ protected:
 	bool bIsShooting = false;
 
 	/** If true, this character has already died */
+	UPROPERTY(ReplicatedUsing=OnRep_bIsDead)
 	bool bIsDead = false;
 
 	/** Deferred destruction on death timer */
@@ -90,7 +92,11 @@ public:
 	FPawnDeathDelegate OnPawnDeath;
 
 protected:
+	UFUNCTION()
+	void OnRep_bIsDead();
 
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
 
@@ -99,9 +105,10 @@ protected:
 
 public:
 
+	AShooterNPC();
 	/** Handle incoming damage */
 	virtual float TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
-
+	float Auth_TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser);
 public:
 
 	//~Begin IShooterWeaponHolder interface
@@ -136,9 +143,14 @@ public:
 	//~End IShooterWeaponHolder interface
 
 protected:
+	UFUNCTION()
+	void OnRep_CurrentHP();
+	UFUNCTION()
+	void OnRep_Weapon();
 
+	
 	/** Called when HP is depleted and the character should die */
-	void Die();
+	void Auth_Die(AController* KillerController);
 
 	/** Called after death to destroy the actor */
 	void DeferredDestruction();

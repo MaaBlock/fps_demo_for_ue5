@@ -10,8 +10,43 @@
 #include "ShooterCharacter.h"
 #include "ShooterBulletCounterUI.h"
 #include "demo.h"
+#include "GameUI.h"
 #include "ShooterUI.h"
 #include "Widgets/Input/SVirtualJoystick.h"
+
+void AShooterPlayerController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+	
+}
+
+void AShooterPlayerController::OnRep_Pawn()
+{
+	UE_LOG(LogTemp, Warning, TEXT("AShooterPlayerController::OnRep_Pawn - Role: %s, New Pawn: %s"), *UEnum::GetValueAsString(GetLocalRole()), GetPawn() ? *GetPawn()->GetName() : TEXT("nullptr"));
+	APawn* NewPawn = GetPawn();
+	if (NewPawn)
+	{
+		//NewPawn->OnDestroyed.AddDynamic(this, &AShooterPlayerController::OnPawnDestroyed);
+		//SetupPawnDelegates(NewPawn);
+	}
+	Super::OnRep_Pawn();
+}
+
+void AShooterPlayerController::SetPawn(APawn* InPawn)
+{
+	Super::SetPawn(InPawn);
+	
+	if (AShooterCharacter* ShooterCharacter = Cast<AShooterCharacter>(InPawn))
+	{
+		ShooterCharacter->Tags.Add(PlayerPawnTag);
+	}
+	if (IsLocalController() && InPawn) 
+	{
+		UE_LOG(LogTemp, Log, TEXT("SetPawn: Executing Client Bindings. Controller Role: %s"), *UEnum::GetValueAsString(GetLocalRole()));
+        
+		SetupPawnDelegates(InPawn); 
+	}
+}
 
 void AShooterPlayerController::BeginPlay()
 {
@@ -53,7 +88,12 @@ void AShooterPlayerController::BeginPlay()
 		
 		ShooterUI = CreateWidget<UShooterUI>(UGameplayStatics::GetPlayerController(GetWorld(), 0), ShooterUIClass);
 		ShooterUI->AddToViewport(0);
-		
+
+		GameUI = CreateWidget<UGameUI>(UGameplayStatics::GetPlayerController(GetWorld(), 0), GameUIClass);
+		if (GameUI)
+		{
+			GameUI->AddToViewport(0);
+		}
 	}
 }
 
@@ -85,22 +125,40 @@ void AShooterPlayerController::SetupInputComponent()
 void AShooterPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
+	UE_LOG(LogTemp, Log, TEXT("AShooterPlayerController::OnPossess - Controller: %s, Pawn: %s, Role: %s"), *GetName(), *InPawn->GetName(), *UEnum::GetValueAsString(GetLocalRole()));
 
+	Client_OnPossess(InPawn);
 	// subscribe to the pawn's OnDestroyed delegate
-	InPawn->OnDestroyed.AddDynamic(this, &AShooterPlayerController::OnPawnDestroyed);
+}
 
-	// is this a shooter character?
+void AShooterPlayerController::Client_OnPossess_Implementation(APawn* InPawn)
+{
+	UE_LOG(LogTemp, Log, TEXT("AShooterPlayerController::Client_OnPossess_Implementation , Role: %s"), *UEnum::GetValueAsString(GetLocalRole()));
+
+	//SetupPawnDelegates(InPawn);
+}
+
+void AShooterPlayerController::SetupPawnDelegates(APawn* InPawn)
+{
+	
 	if (AShooterCharacter* ShooterCharacter = Cast<AShooterCharacter>(InPawn))
 	{
-		// add the player tag
-		ShooterCharacter->Tags.Add(PlayerPawnTag);
-
-		// subscribe to the pawn's delegates
+		
+		ShooterCharacter->OnBulletCountUpdated.RemoveDynamic(this, &AShooterPlayerController::OnBulletCountUpdated);
+		ShooterCharacter->OnDamaged.RemoveDynamic(this, &AShooterPlayerController::OnPawnDamaged);
+		ShooterCharacter->OnDamageEffect.RemoveDynamic(this, &AShooterPlayerController::OnPawnDamageEffect);
+		InPawn->OnDestroyed.RemoveDynamic(this, &AShooterPlayerController::OnPawnDestroyed);
+		
 		ShooterCharacter->OnBulletCountUpdated.AddDynamic(this, &AShooterPlayerController::OnBulletCountUpdated);
 		ShooterCharacter->OnDamaged.AddDynamic(this, &AShooterPlayerController::OnPawnDamaged);
+		ShooterCharacter->OnDamageEffect.AddDynamic(this, &AShooterPlayerController::OnPawnDamageEffect);
+ 
+		InPawn->OnDestroyed.AddDynamic(this, &AShooterPlayerController::OnPawnDestroyed);
 
-		// force update the life bar
 		ShooterCharacter->OnDamaged.Broadcast(1.0f);
+	} else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AShooterPlayerController::SetupPawnDelegates - Expected a ShooterCharacter"));
 	}
 }
 
@@ -132,8 +190,10 @@ void AShooterPlayerController::OnPawnDestroyed(AActor* DestroyedActor)
 void AShooterPlayerController::OnBulletCountUpdated(int32 MagazineSize, int32 Bullets)
 {
 	// update the UI
+	UE_LOG(LogTemp, Log, TEXT("AShooterPlayerController::OnBulletCountUpdated - Magazine Size: %d, Bullets: %d"), MagazineSize, Bullets);
 	if (BulletCounterUI)
 	{
+		
 		BulletCounterUI->BP_UpdateBulletCounter(MagazineSize, Bullets);
 	}
 }
@@ -143,5 +203,17 @@ void AShooterPlayerController::OnPawnDamaged(float LifePercent)
 	if (IsValid(BulletCounterUI))
 	{
 		BulletCounterUI->BP_Damaged(LifePercent);
+	}
+	if (IsValid(GameUI))
+	{
+		GameUI->BP_UpdateHealthBar(LifePercent);	
+	}
+}
+
+void AShooterPlayerController::OnPawnDamageEffect()
+{
+	if (IsValid(BulletCounterUI))
+	{
+		BulletCounterUI->BP_PlayDamageEffect();
 	}
 }

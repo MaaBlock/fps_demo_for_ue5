@@ -2,6 +2,9 @@
 
 
 #include "ShooterCharacter.h"
+
+#include "demo.h"
+#include "DemoPlayerState.h"
 #include "ShooterWeapon.h"
 #include "EnhancedInputComponent.h"
 #include "Components/InputComponent.h"
@@ -12,6 +15,8 @@
 #include "Camera/CameraComponent.h"
 #include "TimerManager.h"
 #include "ShooterGameMode.h"
+#include "Net/UnrealNetwork.h"
+
 
 AShooterCharacter::AShooterCharacter()
 {
@@ -20,6 +25,80 @@ AShooterCharacter::AShooterCharacter()
 
 	// configure movement
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 600.0f, 0.0f);
+}
+
+void AShooterCharacter::OnRep_CurrentWeapon(AShooterWeapon* OldWeapon)
+{
+	OnWeaponDeactivated(OldWeapon);
+	OnWeaponActivated(CurrentWeapon);
+}
+
+void AShooterCharacter::OnRep_CurrentHP()
+{
+	OnDamaged.Broadcast(FMath::Max(0.0f, CurrentHP / MaxHP));
+}
+
+void AShooterCharacter::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AShooterCharacter, CurrentHP);
+	DOREPLIFETIME(AShooterCharacter, OwnedWeapons);
+	DOREPLIFETIME(AShooterCharacter, CurrentWeapon);
+}
+
+void AShooterCharacter::Server_StartFiring_Implementation()
+{
+	Auth_StartFiring();
+}
+
+void AShooterCharacter::Server_StopFiring_Implementation()
+{
+	Auth_StopFiring();
+}
+
+void AShooterCharacter::Server_SwitchWeapon_Implementation()
+{
+	Auth_SwitchWeapon();
+}
+
+void AShooterCharacter::Auth_StopFiring()
+{
+	if (GetLocalRole() != ROLE_Authority)
+		return;
+
+	if (CurrentWeapon)
+	{
+		CurrentWeapon->Auth_StopFiring();
+	}
+}
+
+void AShooterCharacter::Auth_StartFiring()
+{
+	if (GetLocalRole() != ROLE_Authority)
+		return;
+
+	if (CurrentWeapon)
+	{
+		CurrentWeapon->Auth_StartFiring();
+	}
+}
+
+void AShooterCharacter::Auth_SwitchWeapon()
+{
+	if (OwnedWeapons.Num() > 1)
+	{
+		CurrentWeapon->DeactivateWeapon();
+		int32 WeaponIndex = OwnedWeapons.Find(CurrentWeapon);
+		if (WeaponIndex == OwnedWeapons.Num() - 1)
+		{
+			WeaponIndex = 0;
+		}
+		else {
+			++WeaponIndex;
+		}
+		CurrentWeapon = OwnedWeapons[WeaponIndex];
+		CurrentWeapon->ActivateWeapon();
+	}
 }
 
 void AShooterCharacter::BeginPlay()
@@ -61,72 +140,73 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 float AShooterCharacter::TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-	// ignore if already dead
 	if (CurrentHP <= 0.0f)
-	{
 		return 0.0f;
-	}
 
-	// Reduce HP
-	CurrentHP -= Damage;
-
-	// Have we depleted HP?
-	if (CurrentHP <= 0.0f)
-	{
-		Die();
-	}
-
-	// update the HUD
-	OnDamaged.Broadcast(FMath::Max(0.0f, CurrentHP / MaxHP));
+	Auth_TakeDamage(Damage, DamageEvent, EventInstigator, DamageCauser);
+	Local_PlayHitImpactFX();
 
 	return Damage;
 }
 
+float AShooterCharacter::Auth_TakeDamage(float Damage, struct FDamageEvent const& DamageEvent,
+	AController* EventInstigator, AActor* DamageCauser)
+{
+	if (GetLocalRole() != ROLE_Authority)
+		return 0.0f;
+	
+	CurrentHP -= Damage;
+	
+	SV_REPCALL(CurrentHP);
+	
+	if (CurrentHP <= 0.0f)
+	{
+		Auth_Die(EventInstigator);
+	}
+	return Damage;
+}
+
+void AShooterCharacter::Local_PlayHitImpactFX()
+{
+	if (!IsLocallyControlled())
+		return;
+    UE_LOG(LogTemp, Log, TEXT("%s::Local_PlayHitImpactFX - Role: %s"), *GetName(), *UEnum::GetValueAsString(GetLocalRole()));
+	OnDamageEffect.Broadcast();
+}
+
 void AShooterCharacter::DoStartFiring()
 {
-	// fire the current weapon
-	if (CurrentWeapon)
+	if (HasAuthority())
 	{
-		CurrentWeapon->StartFiring();
+		Auth_StartFiring();
+	}
+	else
+	{
+		Server_StartFiring();
 	}
 }
 
 void AShooterCharacter::DoStopFiring()
 {
-	// stop firing the current weapon
-	if (CurrentWeapon)
+	if (HasAuthority())
 	{
-		CurrentWeapon->StopFiring();
+		Auth_StopFiring();
+	}
+	else
+	{
+		Server_StopFiring();
 	}
 }
 
 void AShooterCharacter::DoSwitchWeapon()
 {
-	// ensure we have at least two weapons two switch between
-	if (OwnedWeapons.Num() > 1)
+	if (HasAuthority())
 	{
-		// deactivate the old weapon
-		CurrentWeapon->DeactivateWeapon();
-
-		// find the index of the current weapon in the owned list
-		int32 WeaponIndex = OwnedWeapons.Find(CurrentWeapon);
-
-		// is this the last weapon?
-		if (WeaponIndex == OwnedWeapons.Num() - 1)
-		{
-			// loop back to the beginning of the array
-			WeaponIndex = 0;
-		}
-		else {
-			// select the next weapon index
-			++WeaponIndex;
-		}
-
-		// set the new weapon as current
-		CurrentWeapon = OwnedWeapons[WeaponIndex];
-
-		// activate the new weapon
-		CurrentWeapon->ActivateWeapon();
+		Auth_SwitchWeapon();
+	}
+	else
+	{
+		Server_SwitchWeapon();
 	}
 }
 
@@ -212,10 +292,9 @@ void AShooterCharacter::AddWeaponClass(const TSubclassOf<AShooterWeapon>& Weapon
 
 void AShooterCharacter::OnWeaponActivated(AShooterWeapon* Weapon)
 {
-	// update the bullet counter
+	UE_LOG(LogTemp, Log, TEXT("%s::OnWeaponActivated - Role: %s"), *GetName(), *UEnum::GetValueAsString(GetLocalRole()));
 	OnBulletCountUpdated.Broadcast(Weapon->GetMagazineSize(), Weapon->GetBulletCount());
-
-	// set the character mesh AnimInstances
+	
 	GetFirstPersonMesh()->SetAnimInstanceClass(Weapon->GetFirstPersonAnimInstanceClass());
 	GetMesh()->SetAnimInstanceClass(Weapon->GetThirdPersonAnimInstanceClass());
 }
@@ -246,38 +325,53 @@ AShooterWeapon* AShooterCharacter::FindWeaponOfType(TSubclassOf<AShooterWeapon> 
 
 }
 
-void AShooterCharacter::Die()
+void AShooterCharacter::Auth_Die(AController* KillerController)
 {
-	// deactivate the weapon
-	if (IsValid(CurrentWeapon))
+	if (KillerController && KillerController != GetController())
 	{
-		CurrentWeapon->DeactivateWeapon();
-	}
-
-	// increment the team score
+		if (ADemoPlayerState* KillerPS = Cast<ADemoPlayerState>(KillerController->PlayerState))
+		{
+			int32 KillReward = 500; 
+			KillerPS->Auth_AddCoins(KillReward);
+		}
+	}	
 	if (AShooterGameMode* GM = Cast<AShooterGameMode>(GetWorld()->GetAuthGameMode()))
 	{
 		GM->IncrementTeamScore(TeamByte);
 	}
-		
-	// stop character movement
-	GetCharacterMovement()->StopMovementImmediately();
-
-	// disable controls
-	DisableInput(nullptr);
-
-	// reset the bullet counter UI
-	OnBulletCountUpdated.Broadcast(0, 0);
-
-	// call the BP handler
-	BP_OnDeath();
-
-	// schedule character respawn
-	GetWorld()->GetTimerManager().SetTimer(RespawnTimer, this, &AShooterCharacter::OnRespawn, RespawnTime, false);
+	
+	GetWorld()->GetTimerManager().SetTimer(RespawnTimer, this, &AShooterCharacter::Auth_OnRespawn, RespawnTime, false);
+	MC_Die();
 }
 
-void AShooterCharacter::OnRespawn()
+void AShooterCharacter::MC_Die_Implementation()
 {
-	// destroy the character to force the PC to respawn
+	if (IsValid(CurrentWeapon))
+	{
+		CurrentWeapon->DeactivateWeapon();
+	}
+	
+	GetCharacterMovement()->StopMovementImmediately();
+	DisableInput(nullptr);
+	
+	BP_OnDeath();
+	if (IsLocallyControlled())
+	{
+		OnBulletCountUpdated.Broadcast(0, 0);
+	}
+}
+
+void AShooterCharacter::Auth_OnRespawn()
+{
+	AController* SavedController = GetController();
+
 	Destroy();
+
+	if (SavedController)
+	{
+		if (AShooterGameMode* GM = Cast<AShooterGameMode>(GetWorld()->GetAuthGameMode()))
+		{
+			GM->RestartPlayer(SavedController); 
+		}
+	}
 }

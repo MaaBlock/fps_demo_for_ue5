@@ -34,6 +34,7 @@ AShooterProjectile::AShooterProjectile()
 
 	// set the default damage type
 	HitDamageType = UDamageType::StaticClass();
+	bReplicates = true;
 }
 
 void AShooterProjectile::BeginPlay()

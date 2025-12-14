@@ -2,6 +2,9 @@
 
 
 #include "Variant_Shooter/AI/ShooterNPC.h"
+
+#include "demo.h"
+#include "DemoPlayerState.h"
 #include "ShooterWeapon.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Camera/CameraComponent.h"
@@ -11,18 +14,41 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
+#include "net/UnrealNetwork.h"
+
+void AShooterNPC::OnRep_bIsDead()
+{
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCharacterMovement()->StopActiveMovement();
+
+	GetMesh()->SetCollisionProfileName(RagdollCollisionProfile);
+	GetMesh()->SetSimulatePhysics(true);
+	GetMesh()->SetPhysicsBlendWeight(1.0f);
+}
+
+void AShooterNPC::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(AShooterNPC, CurrentHP);
+	DOREPLIFETIME(AShooterNPC, bIsDead);
+	DOREPLIFETIME(AShooterNPC, Weapon);
+}
 
 void AShooterNPC::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// spawn the weapon
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = this;
-	SpawnParams.Instigator = this;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (HasAuthority())
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Owner = this;
+		SpawnParams.Instigator = this;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	Weapon = GetWorld()->SpawnActor<AShooterWeapon>(WeaponClass, GetActorTransform(), SpawnParams);
+		Weapon = GetWorld()->SpawnActor<AShooterWeapon>(WeaponClass, GetActorTransform(), SpawnParams);
+	}
 }
 
 void AShooterNPC::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -33,23 +59,33 @@ void AShooterNPC::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	GetWorld()->GetTimerManager().ClearTimer(DeathTimer);
 }
 
+AShooterNPC::AShooterNPC()
+{
+	bReplicates = true;
+}
+
 float AShooterNPC::TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-	// ignore if already dead
 	if (bIsDead)
 	{
 		return 0.0f;
 	}
+	Auth_TakeDamage(Damage, DamageEvent, EventInstigator, DamageCauser);
 
-	// Reduce HP
+	return Damage;
+}
+
+float AShooterNPC::Auth_TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator,
+	AActor* DamageCauser)
+{
+	if (!HasAuthority())
+		return 0.0f;
 	CurrentHP -= Damage;
 
-	// Have we depleted HP?
 	if (CurrentHP <= 0.0f)
 	{
-		Die();
+		Auth_Die(EventInstigator);
 	}
-
 	return Damage;
 }
 
@@ -144,41 +180,44 @@ void AShooterNPC::OnSemiWeaponRefire()
 	if (bIsShooting)
 	{
 		// fire the weapon
-		Weapon->StartFiring();
+		Weapon->Auth_StartFiring();
 	}
 }
 
-void AShooterNPC::Die()
+void AShooterNPC::OnRep_CurrentHP()
 {
-	// ignore if already dead
+	
+}
+
+void AShooterNPC::OnRep_Weapon()
+{
+	
+}
+
+void AShooterNPC::Auth_Die(AController* KillerController)
+{
 	if (bIsDead)
 	{
 		return;
 	}
 
-	// raise the dead flag
 	bIsDead = true;
 
-	// increment the team score
+	
+	if (KillerController && KillerController != GetController())
+	{
+		if (ADemoPlayerState* KillerPS = Cast<ADemoPlayerState>(KillerController->PlayerState))
+		{
+			int32 KillReward = 100; 
+			KillerPS->Auth_AddCoins(KillReward);
+		}
+	}	
+
 	if (AShooterGameMode* GM = Cast<AShooterGameMode>(GetWorld()->GetAuthGameMode()))
 	{
 		GM->IncrementTeamScore(TeamByte);
 	}
-
-	// disable capsule collision
-	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	// stop movement
-	GetCharacterMovement()->StopMovementImmediately();
-	GetCharacterMovement()->StopActiveMovement();
-
-	// enable ragdoll physics on the third person mesh
-	GetMesh()->SetCollisionProfileName(RagdollCollisionProfile);
-	GetMesh()->SetSimulatePhysics(true);
-	GetMesh()->SetPhysicsBlendWeight(1.0f);
-
-	// schedule actor destruction
-	GetWorld()->GetTimerManager().SetTimer(DeathTimer, this, &AShooterNPC::DeferredDestruction, DeferredDestructionTime, false);
+	SV_REPCALL(bIsDead);
 }
 
 void AShooterNPC::DeferredDestruction()
@@ -195,7 +234,8 @@ void AShooterNPC::StartShooting(AActor* ActorToShoot)
 	bIsShooting = true;
 
 	// signal the weapon
-	Weapon->StartFiring();
+	if (HasAuthority())
+		Weapon->Auth_StartFiring();
 }
 
 void AShooterNPC::StopShooting()
@@ -204,5 +244,6 @@ void AShooterNPC::StopShooting()
 	bIsShooting = false;
 
 	// signal the weapon
-	Weapon->StopFiring();
+	if (HasAuthority())
+		Weapon->Auth_StopFiring();
 }
