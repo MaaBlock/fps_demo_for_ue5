@@ -43,23 +43,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Shooter|Respawn")
 	TSubclassOf<AShooterCharacter> CharacterClass;
 
-	/** Type of bullet counter UI widget to spawn */
-	UPROPERTY(EditAnywhere, Category="Shooter|UI")
-	TSubclassOf<UShooterBulletCounterUI> BulletCounterUIClass;
-
 	/** Tag to grant the possessed pawn to flag it as the player */
 	UPROPERTY(EditAnywhere, Category="Shooter|Player")
 	FName PlayerPawnTag = FName("Player");
 
-	/** Pointer to the bullet counter UI widget */
-	TObjectPtr<UShooterBulletCounterUI> BulletCounterUI;
-
-	/** Type of UI widget to spawn */
-	UPROPERTY(EditAnywhere, Category="Shooter")
-	TSubclassOf<UShooterUI> ShooterUIClass;
-
-	/** Pointer to the UI widget */
-	TObjectPtr<UShooterUI> ShooterUI;
 
 	
 	/** Type of UI widget to spawn */

@@ -72,23 +72,6 @@ void AShooterPlayerController::BeginPlay()
 			}
 		}
 
-		// create the bullet counter widget and add it to the screen
-		BulletCounterUI = CreateWidget<UShooterBulletCounterUI>(this, BulletCounterUIClass);
-
-		if (BulletCounterUI)
-		{
-			BulletCounterUI->AddToPlayerScreen(0);
-
-		} else {
-
-			UE_LOG(Logdemo, Error, TEXT("Could not spawn bullet counter widget."));
-
-		}
-
-		
-		ShooterUI = CreateWidget<UShooterUI>(UGameplayStatics::GetPlayerController(GetWorld(), 0), ShooterUIClass);
-		ShooterUI->AddToViewport(0);
-
 		GameUI = CreateWidget<UGameUI>(UGameplayStatics::GetPlayerController(GetWorld(), 0), GameUIClass);
 		if (GameUI)
 		{
@@ -165,7 +148,7 @@ void AShooterPlayerController::SetupPawnDelegates(APawn* InPawn)
 void AShooterPlayerController::OnPawnDestroyed(AActor* DestroyedActor)
 {
 	// reset the bullet counter HUD
-	BulletCounterUI->BP_UpdateBulletCounter(0, 0);
+	GameUI->BP_UpdateBulletCounter(0,0);
 
 	// find the player start
 	TArray<AActor*> ActorList;
@@ -189,13 +172,7 @@ void AShooterPlayerController::OnPawnDestroyed(AActor* DestroyedActor)
 
 void AShooterPlayerController::OnBulletCountUpdated(int32 MagazineSize, int32 Bullets)
 {
-	// update the UI
-	UE_LOG(LogTemp, Log, TEXT("AShooterPlayerController::OnBulletCountUpdated - Magazine Size: %d, Bullets: %d"), MagazineSize, Bullets);
-	if (BulletCounterUI)
-	{
-		
-		BulletCounterUI->BP_UpdateBulletCounter(MagazineSize, Bullets);
-	}
+	GameUI->BP_UpdateBulletCounter(MagazineSize, Bullets);
 }
 
 void AShooterPlayerController::OnPawnDamaged(float LifePercent)
@@ -208,8 +185,8 @@ void AShooterPlayerController::OnPawnDamaged(float LifePercent)
 
 void AShooterPlayerController::OnPawnDamageEffect()
 {
-	if (IsValid(BulletCounterUI))
+	if (IsValid(GameUI))
 	{
-		BulletCounterUI->BP_PlayDamageEffect();
+		GameUI->BP_PlayDamageEffect();
 	}
 }

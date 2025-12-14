@@ -26,4 +26,9 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category="UI", meta = (DisplayName = "Update Health Bar"))
 	void BP_UpdateHealthBar(float percent);
 	
+	UFUNCTION(BlueprintImplementableEvent, Category="Shooter", meta=(DisplayName = "UpdateBulletCounter"))
+	void BP_UpdateBulletCounter(int32 MagazineSize, int32 BulletCount);
+	
+	UFUNCTION(BlueprintImplementableEvent, Category="Shooter", meta=(DisplayName = "PlayDamageEffect"))
+	void BP_PlayDamageEffect();
 };

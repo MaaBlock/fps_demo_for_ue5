@@ -16,10 +16,4 @@ class DEMO_API UShooterBulletCounterUI : public UUserWidget
 	
 public:
 
-	/** Allows Blueprint to update sub-widgets with the new bullet count */
-	UFUNCTION(BlueprintImplementableEvent, Category="Shooter", meta=(DisplayName = "UpdateBulletCounter"))
-	void BP_UpdateBulletCounter(int32 MagazineSize, int32 BulletCount);
-
-	UFUNCTION(BlueprintImplementableEvent, Category="Shooter", meta=(DisplayName = "PlayDamageEffect"))
-	void BP_PlayDamageEffect();
 };
